@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,35 +15,66 @@ def load_assets():
 saved, df = load_assets()
 model, features = saved["model"], saved["features"]
 
-# Récupération des poids du modèle pour expliquer chaque décision
 scaler = model.named_steps["standardscaler"]
 clf = model.named_steps["logisticregression"]
 
 LABELS = {
-    "loan_amount_fcfa": "Montant du prêt demandé",
-    "nb_tx_180d": "Volume de transactions (6 mois)",
-    "total_in_180d": "Total des entrées d'argent (6 mois)",
-    "total_out_180d": "Total des sorties d'argent (6 mois)",
-    "avg_balance_180d": "Solde moyen conservé (6 mois)",
-    "min_balance_180d": "Solde minimum atteint",
-    "std_balance_180d": "Stabilité du solde",
-    "nb_bills_180d": "Paiements de factures réguliers",
-    "nb_airtime_180d": "Achats de crédit téléphonique",
-    "active_days_180d": "Fréquence de jours actifs",
-    "nb_tx_30d": "Activité récente (30 derniers jours)",
-    "total_in_30d": "Revenus récents (30 derniers jours)",
-    "avg_balance_30d": "Liquidité récente (30 jours)",
+    "loan_amount_fcfa": "Montant du prêt demandé (FCFA)",
+    "nb_tx_180d": "Nombre de transactions (6 mois)",
+    "total_in_180d": "Total entrées d'argent 6 mois (FCFA)",
+    "total_out_180d": "Total sorties d'argent 6 mois (FCFA)",
+    "avg_balance_180d": "Solde moyen 6 mois (FCFA)",
+    "min_balance_180d": "Solde minimum atteint (FCFA)",
+    "std_balance_180d": "Stabilité du solde (FCFA)",
+    "nb_bills_180d": "Factures payées (6 mois)",
+    "nb_airtime_180d": "Achats crédit téléphonique (6 mois)",
+    "active_days_180d": "Nombre de jours actifs (6 mois)",
+    "nb_tx_30d": "Transactions récentes (30 jours)",
+    "total_in_30d": "Entrées d'argent 30 jours (FCFA)",
+    "avg_balance_30d": "Solde moyen 30 jours (FCFA)",
     "ratio_in_out_180d": "Ratio Entrées / Sorties",
     "loan_to_income_ratio": "Taux d'endettement (Prêt / Revenu)",
     "activity_trend_30d_vs_avg": "Dynamique d'activité récente"
 }
+
+# Dictionnaire de correspondance exacte pour Excel en français
+FR_COLS = {
+    "loan_amount_fcfa": "Montant_Demande_FCFA",
+    "nb_tx_180d": "Nb_Transactions_6_Mois",
+    "total_in_180d": "Entrees_6_Mois_FCFA",
+    "total_out_180d": "Sorties_6_Mois_FCFA",
+    "avg_balance_180d": "Solde_Moyen_6_Mois_FCFA",
+    "min_balance_180d": "Solde_Minimum_FCFA",
+    "std_balance_180d": "Variabilite_Solde_FCFA",
+    "nb_bills_180d": "Factures_Payees_6_Mois",
+    "nb_airtime_180d": "Achats_Credit_Tel_6_Mois",
+    "active_days_180d": "Jours_Actifs_6_Mois",
+    "nb_tx_30d": "Nb_Transactions_30_Jours",
+    "total_in_30d": "Entrees_30_Jours_FCFA",
+    "avg_balance_30d": "Solde_Moyen_30_Jours_FCFA",
+    "ratio_in_out_180d": "Ratio_Entrees_Sorties",
+    "loan_to_income_ratio": "Ratio_Endettement",
+    "activity_trend_30d_vs_avg": "Tendance_Activite_Recente"
+}
+INV_FR_COLS = {v: k for k, v in FR_COLS.items()}
+
+def to_clean_excel(dataframe, sheet_name="Scoring_Credit"):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        dataframe.to_excel(writer, index=False, sheet_name=sheet_name)
+        ws = writer.sheets[sheet_name]
+        # Ajustement automatique de la largeur des colonnes pour un rendu propre
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or "")) for cell in col) + 4
+            ws.column_dimensions[col[0].column_letter].width = max(max_len, 16)
+    return output.getvalue()
 
 st.title("💳 Moteur de Scoring Crédit - Mobile Money Pro")
 st.caption("Plateforme B2B d'aide à la décision et de gestion du risque pour la microfinance (FCFA)")
 
 tab1, tab2, tab3 = st.tabs([
     "🔍 Évaluation Individuelle & Explicabilité",
-    "📂 Analyse de Relevés / Portefeuille (CSV)",
+    "📊 Analyse de Portefeuille Excel (Français)",
     "📈 Simulateur de Rentabilité (Directeur Crédit)"
 ])
 
@@ -74,7 +106,7 @@ with tab1:
         "activity_trend_30d_vs_avg": nb_tx_30d / (nb_tx_180d / 6 + 0.1)
     }
     X_client = pd.DataFrame([{c: inp.get(c, 0) for c in features}])
-    prob = float(model.predict_proba(X_client)[0, 1])
+    prob = float(model.predict_proba(X_client)[:, 1])
     score = int(np.round(300 + (1 - prob) * 550))
 
     st.divider()
@@ -88,9 +120,8 @@ with tab1:
     else:
         r3.error("❌ DÉCISION : PRÊT REFUSÉ")
 
-    # Calcul des facteurs explicatifs (XAI)
-    X_scaled = scaler.transform(X_client)[0]
-    impacts = -X_scaled * clf.coef_[0]  # Positif = améliore le score
+    X_scaled = scaler.transform(X_client)
+    impacts = -X_scaled[0] * clf.coef_[0]
     reasons = sorted(zip(features, impacts), key=lambda x: abs(x[1]), reverse=True)[:4]
 
     st.subheader("📋 Facteurs clés justifiant cette décision (Audit & Conformité)")
@@ -98,33 +129,57 @@ with tab1:
     for idx, (feat, val) in enumerate(reasons):
         label = LABELS.get(feat, feat)
         if val >= 0:
-            exp_cols[idx % 2].info(f"🟢 **Point fort :** {label} (Impact positif sur la solvabilité)")
+            exp_cols[idx % 2].info(f"🟢 **Point fort :** {label} (Impact positif)")
         else:
-            exp_cols[idx % 2].error(f"🔴 **Point de vigilance :** {label} (Facteur de risque détecté)")
+            exp_cols[idx % 2].error(f"🔴 **Point de vigilance :** {label} (Facteur de risque)")
 
-# --- ONGLET 2 : ANALYSE DE FICHIER CLIENT / LOT (CSV) ---
+# --- ONGLET 2 : ANALYSE DE PORTEFEUILLE EXCEL EN FRANÇAIS ---
 with tab2:
-    st.subheader("Scoring automatisé par importation de fichier (Batch Scoring)")
-    st.markdown("Importez un fichier CSV d'indicateurs clients ou téléchargez notre modèle d'exemple pour tester le traitement en masse.")
-    
-    sample_csv = df[features].head(10).to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Télécharger un exemple de fichier client (CSV)", sample_csv, "exemple_clients_mobile_money.csv", "text/csv")
-    
-    uploaded = st.file_uploader("Importer votre fichier CSV de demandes de crédit", type=["csv"])
+    st.subheader("Traitement automatisé des demandes sous Excel (.xlsx)")
+    st.markdown("1. Téléchargez le modèle Excel prêt à l'emploi en français.  \n2. Importez-le pour obtenir les scores et décisions de tout le portefeuille.")
+
+    # Création d'un échantillon propre en français avec identifiant client
+    sample_df = df[features].head(15).copy().round(0)
+    sample_df.insert(0, "ID_Client", [f"CLT_{i:04d}" for i in range(1, len(sample_df) + 1)])
+    sample_df_fr = sample_df.rename(columns=FR_COLS)
+
+    excel_sample = to_clean_excel(sample_df_fr, sheet_name="Demandes_Clients")
+    st.download_button(
+        label="📥 Télécharger le modèle Excel en français (.xlsx)",
+        data=excel_sample,
+        file_name="Modele_Demandes_Credit_MobileMoney.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.divider()
+    uploaded = st.file_uploader("Importer votre fichier Excel de demandes clients (.xlsx)", type=["xlsx"])
     if uploaded is not None:
-        batch_df = pd.read_csv(uploaded)
-        missing = [c for c in features if c not in batch_df.columns]
+        batch_fr = pd.read_excel(uploaded)
+        batch_en = batch_fr.rename(columns=INV_FR_COLS)
+        missing = [FR_COLS.get(c, c) for c in features if c not in batch_en.columns]
+
         if missing:
-            st.error(f"Colonnes manquantes dans le fichier : {missing}")
+            st.error(f"Colonnes manquantes dans votre fichier Excel : {missing}")
         else:
-            probs = model.predict_proba(batch_df[features])[:, 1]
-            batch_df["Score_Credit"] = np.round(300 + (1 - probs) * 550).astype(int)
-            batch_df["Risque_Defaut_%"] = np.round(probs * 100, 1)
-            batch_df["Decision"] = np.where(batch_df["Score_Credit"] >= 600, "ACCORDE", np.where(batch_df["Score_Credit"] >= 500, "SOUS_CONDITIONS", "REFUSE"))
-            st.success(f"✅ {len(batch_df)} dossiers analysés instantanément !")
-            st.dataframe(batch_df[["Score_Credit", "Risque_Defaut_%", "Decision"] + features[:4]])
-            result_csv = batch_df.to_csv(index=False).encode("utf-8")
-            st.download_button("📤 Exporter les décisions pour la banque (CSV)", result_csv, "decisions_scoring_credit.csv", "text/csv")
+            probs = model.predict_proba(batch_en[features])[:, 1]
+            scores = np.round(300 + (1 - probs) * 550).astype(int)
+            decisions = np.where(scores >= 600, "ACCORDÉ", np.where(scores >= 500, "SOUS CONDITIONS", "REFUSÉ"))
+
+            res_df = batch_fr.copy()
+            res_df.insert(1 if "ID_Client" in res_df.columns else 0, "Score_Solvabilite_850", scores)
+            res_df.insert(2 if "ID_Client" in res_df.columns else 1, "Risque_Defaut_%", np.round(probs * 100, 1))
+            res_df.insert(3 if "ID_Client" in res_df.columns else 2, "Decision_Comite", decisions)
+
+            st.success(f"✅ {len(res_df)} dossiers clients analysés et notés avec succès !")
+            st.dataframe(res_df, use_container_width=True)
+
+            excel_result = to_clean_excel(res_df, sheet_name="Decisions_Scoring")
+            st.download_button(
+                label="📤 Télécharger le rapport complet des décisions (.xlsx)",
+                data=excel_result,
+                file_name="Rapport_Decisions_Scoring_Credit.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 # --- ONGLET 3 : SIMULATEUR DE RENTABILITÉ ---
 with tab3:
