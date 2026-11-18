@@ -106,7 +106,7 @@ with tab1:
         "activity_trend_30d_vs_avg": nb_tx_30d / (nb_tx_180d / 6 + 0.1)
     }
     X_client = pd.DataFrame([{c: inp.get(c, 0) for c in features}])
-    prob = float(model.predict_proba(X_client)[:, 1])
+    prob = float(model.predict_proba(X_client)[0, 1])
     score = int(np.round(300 + (1 - prob) * 550))
 
     st.divider()
