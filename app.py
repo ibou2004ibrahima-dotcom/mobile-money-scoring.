@@ -83,7 +83,8 @@ def to_clean_excel(dataframe, sheet_name="Scoring_Credit"):
         ws = writer.sheets[sheet_name]
         header_fill = PatternFill(start_color="0F2C59", end_color="0F2C59", fill_type="solid")
         header_font = Font(color="FFFFFF", bold=True)
-        for cell in ws:
+        for row in ws.iter_rows(min_row=1, max_row=1):
+            for cell in row:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
