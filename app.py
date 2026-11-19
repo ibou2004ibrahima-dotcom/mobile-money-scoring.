@@ -142,7 +142,7 @@ with tab1:
 
     X_scaled = scaler.transform(X_client)
     impacts = (-X_scaled * clf.coef_)[0]
-    reasons = sorted(zip(features, impacts), key=lambda x: abs(x), reverse=True)[:4]
+    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item[1])), reverse=True)[:4]
     st.subheader("📋 Facteurs clés justifiant cette décision (Audit & Conformité)")
     exp_cols = st.columns(2)
     for idx, (feat, val) in enumerate(reasons):
