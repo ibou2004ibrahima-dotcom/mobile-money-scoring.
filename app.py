@@ -112,7 +112,7 @@ def extract_df_from_pdf(uploaded_pdf):
         return pd.DataFrame(rows[1:], columns=rows)
     return pd.DataFrame(rows, columns=["Date", "Type_Operation", "Montant_FCFA", "Solde_Apres_FCFA"][:len(rows)]) if rows else pd.DataFrame()
 
-    def parse_statement(raw_df, loan_amt):
+def parse_statement(raw_df, loan_amt):
         s = raw_df.copy()
         s.columns = [str(c).strip().lower() for c in s.columns]
         d_col = next((c for c in s.columns if "date" in c or "heure" in c), s.columns)
