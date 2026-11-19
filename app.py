@@ -90,7 +90,7 @@ def to_clean_excel(dataframe, sheet_name="Scoring_Credit"):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
         for col in ws.columns:
             max_len = max(len(str(cell.value or "")) for cell in col) + 4
-            ws.column_dimensions[col.column_letter].width = max(max_len, 18)
+            ws.column_dimensions[col[0].column_letter].width = max(max_len, 18)
     return output.getvalue()
 
 tab1, tab2, tab3 = st.tabs([
