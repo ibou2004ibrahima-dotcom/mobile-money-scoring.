@@ -62,9 +62,9 @@ def parse_stmt(raw_df, loan_amt):
     reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item[1])), reverse=True)[:4]
     cols = st.columns(2)
     for i, (f, v) in enumerate(reasons):
-        lbl = LABELS.get(f, f)
-        if v >= 0: cols[i%2].info(f"🟢 **Point fort :** {lbl}")
-        else: cols[i%2].error(f"🔴 **Point de vigilance :** {lbl}")
+    lbl = LABELS.get(f, f)
+    if v >= 0: cols[i%2].info(f"🟢 **Point fort :** {lbl}")
+    else: cols[i%2].error(f"🔴 **Point de vigilance :** {lbl}")
 
 t1, t2, t3, t4 = st.tabs(["📱 Relevé Wave / Orange Money", "🔍 Évaluation Manuelle", "📊 Portefeuille Excel", "📈 Rentabilité"])
 
