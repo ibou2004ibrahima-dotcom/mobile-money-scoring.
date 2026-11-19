@@ -85,9 +85,9 @@ def to_clean_excel(dataframe, sheet_name="Scoring_Credit"):
         header_font = Font(color="FFFFFF", bold=True)
         for row in ws.iter_rows(min_row=1, max_row=1):
             for cell in row:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
         for col in ws.columns:
             max_len = max(len(str(cell.value or "")) for cell in col) + 4
             ws.column_dimensions[col.column_letter].width = max(max_len, 18)
