@@ -50,7 +50,7 @@ def parse_stmt(raw_df, loan_amt):
     return {"loan_amount_fcfa": loan_amt, "nb_tx_180d": len(d180), "total_in_180d": t_in, "total_out_180d": t_out, "avg_balance_180d": d180["bal"].mean() if len(d180)>0 else 0, "min_balance_180d": d180["bal"].min() if len(d180)>0 else 0, "std_balance_180d": d180["bal"].std() if len(d180)>1 else 0, "nb_bills_180d": bills, "nb_airtime_180d": air, "active_days_180d": d180["dt"].dt.date.nunique(), "nb_tx_30d": len(d30), "total_in_30d": d30.loc[d30["is_in"]==1, "amt"].sum(), "avg_balance_30d": d30["bal"].mean() if len(d30)>0 else 0, "ratio_in_out_180d": (t_in+1)/(t_out+1), "loan_to_income_ratio": loan_amt/(t_in/6+1), "activity_trend_30d_vs_avg": len(d30)/(len(d180)/6+0.1)}
     def show_result(inp_dict, loan_amt):
     X_c = pd.DataFrame([{c: inp_dict.get(c, 0) for c in features}])
-    prob = float(model.predict_proba(X_c))
+    prob = float(model.predict_proba(X_c)[:, 1][0])
     score = int(np.round(300 + (1 - prob) * 550))
     r1, r2, r3 = st.columns(3)
     r1.metric("Score de Solvabilité (300 - 850)", f"{score} / 850")
@@ -58,8 +58,8 @@ def parse_stmt(raw_df, loan_amt):
     if score >= 600: r3.success("✅ PRÊT ACCORDÉ (100 %)")
     elif score >= 500: r3.warning(f"⚠️ SOUS CONDITIONS (Max : {int(loan_amt*0.5):,} FCFA)".replace(",", " "))
     else: r3.error("❌ PRÊT REFUSÉ")
-    impacts = (-scaler.transform(X_c) * clf.coef_)
-    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item)), reverse=True)[:4]
+    impacts = (-scaler.transform(X_c) * clf.coef_)[0]
+    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item[1])), reverse=True)[:4]
     cols = st.columns(2)
     for i, (f, v) in enumerate(reasons):
         lbl = LABELS.get(f, f)
