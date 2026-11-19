@@ -126,7 +126,7 @@ with tab1:
     }
     X_client = pd.DataFrame([{c: inp.get(c, 0) for c in features}])
     probs_client = model.predict_proba(X_client)
-    prob = float(probs_client.item())
+    prob = float(probs_client[0, 1])
     score = int(np.round(300 + (1 - prob) * 550))
 
     st.divider()
@@ -141,9 +141,9 @@ with tab1:
         r3.error("❌ DÉCISION : PRÊT REFUSÉ (Risque trop élevé)")
 
     X_scaled = scaler.transform(X_client)
-    impacts = (-X_scaled * clf.coef_)
+    impacts = (-X_scaled * clf.coef_)[0]
     reasons = sorted(zip(features, impacts), key=lambda x: abs(x), reverse=True)[:4]
-
+impacts = (-X_scaled[0] * clf.coef_[0])).
     st.subheader("📋 Facteurs clés justifiant cette décision (Audit & Conformité)")
     exp_cols = st.columns(2)
     for idx, (feat, val) in enumerate(reasons):
