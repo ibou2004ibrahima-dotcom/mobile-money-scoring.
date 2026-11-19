@@ -149,7 +149,7 @@ def extract_df_from_pdf(uploaded_pdf):
 
 def display_scoring(inp_dict, loan_amt):
     X_c = pd.DataFrame([{c: inp_dict.get(c, 0) for c in features}])
-    prob = float(model.predict_proba(X_c)[:, 1])
+    prob = float(model.predict_proba(X_c)[0, 1])
     score = int(np.round(300 + (1 - prob) * 550))
     r1, r2, r3 = st.columns(3)
     r1.metric("Score de Solvabilité (300 - 850)", f"{score} / 850")
