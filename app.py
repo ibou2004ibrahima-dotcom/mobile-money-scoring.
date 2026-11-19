@@ -161,7 +161,7 @@ def display_scoring(inp_dict, loan_amt):
     else:
         r3.error("❌ DÉCISION : PRÊT REFUSÉ")
     impacts = (-scaler.transform(X_c) * clf.coef_)
-    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item)), reverse=True)[:4]
+    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item[1])), reverse=True)[:4]
     st.subheader("📋 Facteurs clés justifiant la décision (Audit)")
     cols = st.columns(2)
     for i, (f, v) in enumerate(reasons):
