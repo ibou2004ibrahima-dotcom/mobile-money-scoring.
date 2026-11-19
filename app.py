@@ -160,7 +160,7 @@ def display_scoring(inp_dict, loan_amt):
         r3.warning(f"⚠️ ACCORD SOUS CONDITIONS (Max : {int(loan_amt*0.5):,} FCFA)".replace(",", " "))
     else:
         r3.error("❌ DÉCISION : PRÊT REFUSÉ")
-    impacts = (-scaler.transform(X_c) * clf.coef_)
+    impacts = (-scaler.transform(X_c) * clf.coef_).flatten()
     reasons = list(zip(features, impacts))[:4]
     st.subheader("📋 Facteurs clés justifiant la décision (Audit)")
     cols = st.columns(2)
