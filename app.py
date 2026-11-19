@@ -125,9 +125,9 @@ def extract_df_from_pdf(uploaded_pdf):
     s["op"] = s[t_col].astype(str).str.upper()
     s["is_in"] = s["op"].apply(lambda x: 1 if any(k in x for k in ["DEPOT", "RECU", "CREDIT", "CASH_IN", "P2P_IN", "ENTR"]) else 0)
     if b_col is not None:
-        s["bal"] = pd.to_numeric(s[b_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
+    s["bal"] = pd.to_numeric(s[b_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
     else:
-        s["bal"] = np.maximum(0, np.cumsum(np.where(s["is_in"] == 1, s["amt"], -s["amt"])) + 5000)
+    s["bal"] = np.maximum(0, np.cumsum(np.where(s["is_in"] == 1, s["amt"], -s["amt"])) + 5000)
     m = s["dt"].max()
     d180 = s[s["dt"] >= m - pd.Timedelta(days=180)]
     d30 = s[s["dt"] >= m - pd.Timedelta(days=30)]
@@ -136,15 +136,15 @@ def extract_df_from_pdf(uploaded_pdf):
     bills = d180["op"].apply(lambda x: 1 if any(k in x for k in ["FACTURE", "SENELEC", "WOYOFAL", "EAU", "CANAL"]) else 0).sum()
     air = d180["op"].apply(lambda x: 1 if any(k in x for k in ["PASS", "ILLIMIX", "RECHARGE", "SEDDO"]) else 0).sum()
     return {
-        "loan_amount_fcfa": loan_amt, "nb_tx_180d": len(d180), "total_in_180d": t_in, "total_out_180d": t_out,
-        "avg_balance_180d": d180["bal"].mean() if len(d180) > 0 else 0,
-        "min_balance_180d": d180["bal"].min() if len(d180) > 0 else 0,
-        "std_balance_180d": d180["bal"].std() if len(d180) > 1 else 0,
-        "nb_bills_180d": bills, "nb_airtime_180d": air, "active_days_180d": d180["dt"].dt.date.nunique(),
-        "nb_tx_30d": len(d30), "total_in_30d": d30.loc[d30["is_in"] == 1, "amt"].sum(),
-        "avg_balance_30d": d30["bal"].mean() if len(d30) > 0 else 0,
-        "ratio_in_out_180d": (t_in + 1) / (t_out + 1), "loan_to_income_ratio": loan_amt / (t_in / 6 + 1),
-        "activity_trend_30d_vs_avg": len(d30) / (len(d180) / 6 + 0.1)
+    "loan_amount_fcfa": loan_amt, "nb_tx_180d": len(d180), "total_in_180d": t_in, "total_out_180d": t_out,
+    "avg_balance_180d": d180["bal"].mean() if len(d180) > 0 else 0,
+    "min_balance_180d": d180["bal"].min() if len(d180) > 0 else 0,
+    "std_balance_180d": d180["bal"].std() if len(d180) > 1 else 0,
+    "nb_bills_180d": bills, "nb_airtime_180d": air, "active_days_180d": d180["dt"].dt.date.nunique(),
+    "nb_tx_30d": len(d30), "total_in_30d": d30.loc[d30["is_in"] == 1, "amt"].sum(),
+    "avg_balance_30d": d30["bal"].mean() if len(d30) > 0 else 0,
+    "ratio_in_out_180d": (t_in + 1) / (t_out + 1), "loan_to_income_ratio": loan_amt / (t_in / 6 + 1),
+    "activity_trend_30d_vs_avg": len(d30) / (len(d180) / 6 + 0.1)
     }
 
 def display_scoring(inp_dict, loan_amt):
