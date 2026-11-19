@@ -90,60 +90,92 @@ def to_clean_excel(dataframe, sheet_name="Scoring_Credit"):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
         for col in ws.columns:
             max_len = max(len(str(cell.value or "")) for cell in col) + 4
-            ws.column_dimensions[col[0].column_letter].width = max(max_len, 18)
+            ws.column_dimensions[col.column_letter].width = max(max_len, 18)
     return output.getvalue()
 
-tab1, tab2, tab3 = st.tabs([
-    "🔍 Évaluation Individuelle & Explicabilité",
-    "📊 Analyse de Portefeuille Excel (.xlsx)",
-    "📈 Simulateur de Rentabilité (Directeur Crédit)"
-])
+def parse_mobile_money_statement(raw_df, loan_amount):
+    df_s = raw_df.copy()
+    df_s.columns = [str(c).strip().lower() for c in df_s.columns]
+    date_col = next((c for c in df_s.columns if "date" in c or "heure" in c or "time" in c), df_s.columns)
+    type_col = next((c for c in df_s.columns if "type" in c or "libelle" in c or "operation" in c or "motif" in c), df_s.columns)
+    amt_col = next((c for c in df_s.columns if "montant" in c or "amount" in c or "somme" in c), df_s.columns)
+    bal_col = next((c for c in df_s.columns if "solde" in c or "balance" in c), None)
 
-with tab1:
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        loan_amount = st.number_input("Montant demandé (FCFA)", 5000, 500000, 25000, 5000)
-        nb_tx_180d = st.slider("Transactions (6 mois)", 1, 150, 45)
-        nb_tx_30d = st.slider("Transactions (30j)", 0, 50, 10)
-        active_days = st.slider("Jours actifs (6 mois)", 1, 180, 35)
-    with c2:
-        total_in = st.number_input("Entrées 6 mois (FCFA)", 0, value=180000, step=10000)
-        total_out = st.number_input("Sorties 6 mois (FCFA)", 0, value=150000, step=10000)
-        total_in_30d = st.number_input("Entrées 30j (FCFA)", 0, value=35000, step=5000)
-        avg_bal_180d = st.number_input("Solde moyen 6 mois (FCFA)", 0, value=12000, step=1000)
-    with c3:
-        avg_bal_30d = st.number_input("Solde moyen 30j (FCFA)", 0, value=15000, step=1000)
-        min_bal = st.number_input("Solde minimum (FCFA)", 0, value=1000, step=500)
-        nb_bills = st.slider("Factures payées (6 mois)", 0, 20, 4)
-        nb_airtime = st.slider("Achats crédit tél. (6 mois)", 0, 50, 12)
+    df_s["dt"] = pd.to_datetime(df_s[date_col], errors="coerce")
+    df_s = df_s.dropna(subset=["dt"]).sort_values("dt")
+    df_s["amt"] = pd.to_numeric(df_s[amt_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
+    df_s["op"] = df_s[type_col].astype(str).str.upper()
 
-    inp = {
-        "loan_amount_fcfa": loan_amount, "nb_tx_180d": nb_tx_180d, "total_in_180d": total_in, "total_out_180d": total_out,
-        "avg_balance_180d": avg_bal_180d, "min_balance_180d": min_bal, "std_balance_180d": avg_bal_180d * 0.4,
-        "nb_bills_180d": nb_bills, "nb_airtime_180d": nb_airtime, "active_days_180d": active_days,
-        "nb_tx_30d": nb_tx_30d, "total_in_30d": total_in_30d, "avg_balance_30d": avg_bal_30d,
-        "ratio_in_out_180d": (total_in + 1) / (total_out + 1), "loan_to_income_ratio": loan_amount / (total_in / 6 + 1),
+    in_keywords = ["DEPOT", "RECU", "RECEPTION", "CASH_IN", "P2P_IN", "CREDIT", "ENTR", "VIREMENT RECU"]
+    df_s["is_in"] = df_s["op"].apply(lambda x: 1 if any(k in x for k in in_keywords) else 0)
+    df_s["amt_abs"] = df_s["amt"].abs()
+
+    if bal_col is not None:
+        df_s["bal"] = pd.to_numeric(df_s[bal_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
+    else:
+        signed = np.where(df_s["is_in"] == 1, df_s["amt_abs"], -df_s["amt_abs"])
+        df_s["bal"] = np.maximum(0, np.cumsum(signed) + 5000)
+
+    max_date = df_s["dt"].max()
+    df_180 = df_s[df_s["dt"] >= max_date - pd.Timedelta(days=180)]
+    df_30 = df_s[df_s["dt"] >= max_date - pd.Timedelta(days=30)]
+
+    nb_tx_180d = len(df_180)
+    total_in_180d = df_180.loc[df_180["is_in"] == 1, "amt_abs"].sum()
+    total_out_180d = df_180.loc[df_180["is_in"] == 0, "amt_abs"].sum()
+    avg_balance_180d = df_180["bal"].mean() if nb_tx_180d > 0 else 0
+    min_balance_180d = df_180["bal"].min() if nb_tx_180d > 0 else 0
+    std_balance_180d = df_180["bal"].std() if nb_tx_180d > 1 else 0
+
+    bill_kw = ["FACTURE", "SENELEC", "WOYOFAL", "SEN'EAU", "SENEAU", "CANAL", "BILL", "RAPIDO"]
+    airtime_kw = ["CREDIT", "PASS", "RECHARGE", "AIRTIME", "ILLIMIX", "SEDDO"]
+    nb_bills_180d = df_180["op"].apply(lambda x: 1 if any(k in x for k in bill_kw) else 0).sum()
+    nb_airtime_180d = df_180["op"].apply(lambda x: 1 if any(k in x for k in airtime_kw) and not any(b in x for b in bill_kw) else 0).sum()
+    active_days_180d = df_180["dt"].dt.date.nunique()
+
+    nb_tx_30d = len(df_30)
+    total_in_30d = df_30.loc[df_30["is_in"] == 1, "amt_abs"].sum()
+    avg_balance_30d = df_30["bal"].mean() if nb_tx_30d > 0 else avg_balance_180d
+
+    return {
+        "loan_amount_fcfa": loan_amount,
+        "nb_tx_180d": nb_tx_180d,
+        "total_in_180d": total_in_180d,
+        "total_out_180d": total_out_180d,
+        "avg_balance_180d": avg_balance_180d,
+        "min_balance_180d": min_balance_180d,
+        "std_balance_180d": 0 if np.isnan(std_balance_180d) else std_balance_180d,
+        "nb_bills_180d": nb_bills_180d,
+        "nb_airtime_180d": nb_airtime_180d,
+        "active_days_180d": active_days_180d,
+        "nb_tx_30d": nb_tx_30d,
+        "total_in_30d": total_in_30d,
+        "avg_balance_30d": avg_balance_30d,
+        "ratio_in_out_180d": (total_in_180d + 1) / (total_out_180d + 1),
+        "loan_to_income_ratio": loan_amount / (total_in_180d / 6 + 1),
         "activity_trend_30d_vs_avg": nb_tx_30d / (nb_tx_180d / 6 + 0.1)
     }
-    X_client = pd.DataFrame([{c: inp.get(c, 0) for c in features}])
-    probs_client = model.predict_proba(X_client)
-    prob = float(probs_client[0, 1])
+
+def render_decision_and_xai(inp_dict, loan_amt):
+    X_c = pd.DataFrame([{c: inp_dict.get(c, 0) for c in features}])
+    probs_c = model.predict_proba(X_c)
+    prob = float(probs_c)
     score = int(np.round(300 + (1 - prob) * 550))
 
-    st.divider()
     r1, r2, r3 = st.columns(3)
     r1.metric("Score de Solvabilité (300 - 850)", f"{score} / 850")
     r2.metric("Risque de défaut estimé", f"{prob:.1%}")
     if score >= 600:
         r3.success("✅ DÉCISION : PRÊT ACCORDÉ (100 % du montant)")
     elif score >= 500:
-        r3.warning(f"⚠️ ACCORD SOUS CONDITIONS (Plafond conseillé : {int(loan_amount*0.5):,} FCFA)".replace(",", " "))
+        r3.warning(f"⚠️ ACCORD SOUS CONDITIONS (Plafond conseillé : {int(loan_amt*0.5):,} FCFA)".replace(",", " "))
     else:
         r3.error("❌ DÉCISION : PRÊT REFUSÉ (Risque trop élevé)")
 
-    X_scaled = scaler.transform(X_client)
-    impacts = (-X_scaled * clf.coef_)[0]
-    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item[1])), reverse=True)[:4]
+    X_scaled = scaler.transform(X_c)
+    impacts = (-X_scaled * clf.coef_)
+    reasons = sorted(zip(features, impacts), key=lambda item: abs(float(item)), reverse=True)[:4]
+
     st.subheader("📋 Facteurs clés justifiant cette décision (Audit & Conformité)")
     exp_cols = st.columns(2)
     for idx, (feat, val) in enumerate(reasons):
@@ -153,56 +185,18 @@ with tab1:
         else:
             exp_cols[idx % 2].error(f"🔴 **Point de vigilance :** {label} (Facteur de risque)")
 
-with tab2:
-    st.subheader("Traitement automatisé des demandes sous Excel (.xlsx)")
-    st.markdown("1. Téléchargez le tableau Excel modèle prêt à l'emploi en français.  \n2. Importez-le pour obtenir les scores et décisions de tout le portefeuille sous Excel.")
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📱 Analyse Relevé Wave / Orange Money",
+    "🔍 Évaluation Individuelle Manuelle",
+    "📊 Analyse de Portefeuille Excel (.xlsx)",
+    "📈 Simulateur de Rentabilité (Directeur Crédit)"
+])
 
-    sample_df = df[features].head(15).copy().round(2)
-    sample_df.insert(0, "ID_Client", [f"CLT_{i:04d}" for i in range(1, len(sample_df) + 1)])
-    sample_df_fr = sample_df.rename(columns=FR_COLS)
+with tab1:
+    st.subheader("Lecture automatique d'un relevé de transactions Wave ou Orange Money")
+    st.markdown("Importez l'historique brut des transactions du client (Excel `.xlsx` ou `.csv`) : **TerangaScore PRO** extrait automatiquement ses flux sur 30 et 180 jours et calcule sa solvabilité.")
 
-    excel_sample = to_clean_excel(sample_df_fr, sheet_name="Demandes_Clients")
-    st.download_button(
-        label="📥 Télécharger le fichier Excel modèle en français (.xlsx)",
-        data=excel_sample,
-        file_name=f"{BRAND_NAME}_Modele_Demandes_Credit.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    st.divider()
-    uploaded = st.file_uploader("Importer votre fichier Excel (.xlsx)", type=["xlsx"])
-    if uploaded is not None:
-        batch_fr = pd.read_excel(uploaded)
-        batch_en = batch_fr.rename(columns=INV_FR_COLS)
-        missing = [FR_COLS.get(c, c) for c in features if c not in batch_en.columns]
-
-        if missing:
-            st.error(f"Colonnes manquantes dans votre fichier Excel : {missing}")
-        else:
-            probs = model.predict_proba(batch_en[features])[:, 1]
-            scores = np.round(300 + (1 - probs) * 550).astype(int)
-            decisions = np.where(scores >= 600, "ACCORDÉ", np.where(scores >= 500, "SOUS CONDITIONS", "REFUSÉ"))
-
-            res_df = batch_fr.copy()
-            pos = 1 if "ID_Client" in res_df.columns else 0
-            res_df.insert(pos, "Score_Solvabilite_850", scores)
-            res_df.insert(pos + 1, "Risque_Defaut_%", np.round(probs * 100, 1))
-            res_df.insert(pos + 2, "Decision_Comite", decisions)
-
-            st.success(f"✅ {len(res_df)} dossiers clients analysés et notés par {BRAND_NAME} !")
-            st.dataframe(res_df, use_container_width=True)
-
-            excel_result = to_clean_excel(res_df, sheet_name="Decisions_Scoring")
-            st.download_button(
-                label="📤 Télécharger le rapport complet des décisions sous Excel (.xlsx)",
-                data=excel_result,
-                file_name=f"{BRAND_NAME}_Rapport_Decisions_Credit.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-with tab3:
-    st.subheader("Pilotage du risque et de la rentabilité (Outil Directeur Crédit)")
-    cutoff = st.slider("Seuil minimum d'acceptation (Cut-off Score)", 350, 800, 550, 10)
-    rate = st.slider("Taux d'intérêt / commission sur le prêt (%)", 5, 30, 15) / 100
-    df["score"] = np.round(300 + (1 - model.predict_proba(df[features])[:, 1]) * 550).astype(int)
-    app_df = df[df["score"] >= cutoff]
+    sample_stmt = pd.DataFrame([
+        {"Date": "2026-06-05 10:15", "Operateur": "Wave", "Type_Operation": "Dépôt marchand", "Montant_FCFA": 45000, "Solde_Apres_FCFA": 48000},
+        {"Date": "2026-06-12 18:30", "Operateur": "Wave", "Type_Operation": "Paiement Facture Woyofal", "Montant_FCFA": 10000, "Solde_Apres_FCFA": 38000},
+        {"Date": "2026-07-03 09:20", "Operateur": "Orange Money", "Type_Operation": "Transfert reçu", "Montant_FCFA": 60000, "Solde_Apres_FCFA": 98000},
