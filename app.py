@@ -125,9 +125,9 @@ def extract_df_from_pdf(uploaded_pdf):
         s["op"] = s[t_col].astype(str).str.upper()
         s["is_in"] = s["op"].apply(lambda x: 1 if any(k in x for k in ["DEPOT", "RECU", "CREDIT", "CASH_IN", "P2P_IN", "ENTR"]) else 0)
         if b_col is not None:
-        s["bal"] = pd.to_numeric(s[b_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
+            s["bal"] = pd.to_numeric(s[b_col].astype(str).str.replace(r"[^\d.-]", "", regex=True), errors="coerce").fillna(0)
         else:
-        s["bal"] = np.maximum(0, np.cumsum(np.where(s["is_in"] == 1, s["amt"], -s["amt"])) + 5000)
+            s["bal"] = np.maximum(0, np.cumsum(np.where(s["is_in"] == 1, s["amt"], -s["amt"])) + 5000)
         m = s["dt"].max()
         d180 = s[s["dt"] >= m - pd.Timedelta(days=180)]
         d30 = s[s["dt"] >= m - pd.Timedelta(days=30)]
