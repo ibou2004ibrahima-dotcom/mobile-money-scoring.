@@ -171,15 +171,17 @@ def display_scoring(inp_dict, loan_amt):
         else:
             cols[i % 2].error(f"🔴 **Point de vigilance :** {lbl}")
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📱 Relevé Wave / Orange Money (PDF & Excel)",
     "🔍 Évaluation Individuelle",
     "📊 Portefeuille Excel (.xlsx)",
-    "📈 Simulateur Rentabilité"
+    "📈 Simulateur Rentabilité",
+    "🔒 Confidentialité & Conformité (CDP)"
 ])
 
 with tab1:
     st.subheader("Lecture automatique d'un relevé brut Wave ou Orange Money (PDF, Excel ou CSV)")
+    consent_ok = st.checkbox("✅ Je certifie que le client a donné son consentement explicite pour l'analyse de son relevé (Loi n° 2008-12 - Sénégal).", value=True)
     ex_stmt = pd.DataFrame([
         {"Date": "2026-06-05", "Operateur": "Wave", "Type_Operation": "Dépôt marchand", "Montant_FCFA": 45000, "Solde_Apres_FCFA": 48000},
         {"Date": "2026-07-12", "Operateur": "Wave", "Type_Operation": "Paiement Facture Woyofal", "Montant_FCFA": 10000, "Solde_Apres_FCFA": 38000},
@@ -197,8 +199,8 @@ with tab1:
     with c_s1:
         s_loan = st.number_input("Montant demandé (FCFA)", 5000, 1000000, 50000, 5000, key="sl")
     with c_s2:
-        s_file = st.file_uploader("Importer relevé Wave / Orange Money (.pdf, .xlsx ou .csv)", type=["pdf", "xlsx", "csv"])
-    if s_file is not None:
+        s_file = st.file_uploader("Importer relevé Wave / Orange Money (.pdf, .xlsx ou .csv)", type=["pdf", "xlsx", "csv"], disabled=not consent_ok)
+    if s_file is not None and consent_ok:
         if s_file.name.lower().endswith(".pdf"):
             rdf = extract_df_from_pdf(s_file)
         elif s_file.name.lower().endswith(".xlsx"):
@@ -209,7 +211,7 @@ with tab1:
             st.error("Impossible de lire les transactions dans ce fichier. Vérifiez que le PDF contient du texte sélectionnable.")
         else:
             ext = parse_statement(rdf, s_loan)
-            st.success(f"✅ {ext['nb_tx_180d']} transactions extraites automatiquement sur {ext['active_days_180d']} jours actifs.")
+            st.success(f"✅ {ext['nb_tx_180d']} transactions extraites en mémoire vive (aucune donnée conservée après session).")
             display_scoring(ext, s_loan)
 
 with tab2:
@@ -266,5 +268,26 @@ with tab4:
     m2.metric("Taux défaut", f"{app_df['default'].mean() if len(app_df)>0 else 0:.1%}")
     m3.metric("Profit Net Estimé", f"{profit:,.0f} FCFA".replace(",", " "))
 
+with tab5:
+    st.subheader("🔒 Politique de Confidentialité & Protection des Données (Conformité CDP Sénégal)")
+    st.markdown("""
+    **1. Cadre Juridique :** TerangaScore PRO est conçu dans le strict respect de la **Loi n° 2008-12 du 25 janvier 2008** relative à la protection des données à caractère personnel au Sénégal (supervisée par la **CDP**) et des directives de la **BCEAO** sur la transparence des décisions de crédit.
+
+    **2. Principe de Minimisation et Anonymisation :**
+    * L'algorithme fonctionne exclusivement sur des **flux financiers agrégés et anonymisés** (identifiants numériques de type `CLT_0001`).
+    * Aucune donnée directement identifiante (nom, prénom, numéro de téléphone, adresse ou numéro CNI) n'est requise ni exploitée par le moteur prédictif.
+
+    **3. Traitement Éphémère (Zéro Conservation) :**
+    * Les relevés Wave / Orange Money (PDF, Excel ou CSV) importés sur la plateforme sont analysés **uniquement en mémoire vive (RAM)** le temps du calcul du score.
+    * Aucun fichier client n'est stocké sur un disque dur externe ni revendu ou partagé avec des tiers.
+
+    **4. Droit à l'Explication et Contrôle Humain :**
+    * Conformément aux exigences de gouvernance des algorithmes bancaires, chaque score est accompagné des **4 facteurs explicatifs principaux** (*Points forts* et *Points de vigilance*).
+    * TerangaScore PRO est un **outil d'aide à la décision** : la décision finale d'octroi de crédit reste sous la responsabilité humaine de l'agent ou du comité de crédit de l'institution partenaire.
+
+    **5. Responsable du Projet & Contact :**  
+    **Ibrahima DIALLO** — Élève Analyste Statisticien à l'ENSAE Pierre Ndiaye de Dakar, Sénégal.
+    """)
+
 st.divider()
-st.caption("© 2026 TerangaScore PRO — Développé par Ibrahima | Dakar, Sénégal")
+st.caption("© 2026 TerangaScore PRO — Conforme Loi n° 2008-12 (CDP Sénégal) • Développé par Ibrahima DIALLO (ENSAE Dakar)")
