@@ -199,11 +199,11 @@ def display_scoring(inp_dict, loan_amt):
             st.markdown(f'<div style="background:#FFFBEB;border-left:6px solid #F59E0B;padding:16px;border-radius:10px;color:#92400E;font-weight:700;">⚠️ ACCORD SOUS CONDITIONS<br>Plafond conseillé : {int(loan_amt*0.5):,} FCFA</div>'.replace(",", " "), unsafe_allow_html=True)
         else:st.markdown('<div style="background:#FEF2F2;border-left:6px solid #EF4444;padding:16px;border-radius:10px;color:#991B1B;font-weight:700;">❌ DÉCISION : PRÊT REFUSÉ</div>', unsafe_allow_html=True)
 
-    impacts = (-scaler.transform(X_c) * clf.coef_).flatten()
-reasons = sorted(zip(features, impacts), key=lambda pair: abs(pair.__getitem__(1)), reverse=True)[:4]
-st.markdown("### 📋 Facteurs clés justifiant la décision (Audit & Comité)")
-cols = st.columns(2)
-for i, (f, v) in enumerate(reasons):
+        impacts = (-scaler.transform(X_c) * clf.coef_).flatten()
+    reasons = sorted(zip(features, impacts), key=lambda pair: abs(pair.__getitem__(1)), reverse=True)[:4]
+    st.markdown("### 📋 Facteurs clés justifiant la décision (Audit & Comité)")
+    cols = st.columns(2)
+    for i, (f, v) in enumerate(reasons):
         lbl = LABELS.get(f, f)
         if v >= 0:
             cols[i % 2].info(f"🟢 **Point fort :** {lbl}")
