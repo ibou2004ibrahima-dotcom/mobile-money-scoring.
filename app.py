@@ -200,7 +200,7 @@ def display_scoring(inp_dict, loan_amt):
         else:st.markdown('<div style="background:#FEF2F2;border-left:6px solid #EF4444;padding:16px;border-radius:10px;color:#991B1B;font-weight:700;">❌ DÉCISION : PRÊT REFUSÉ</div>', unsafe_allow_html=True)
 
     impacts = (-scaler.transform(X_c) * clf.coef_).flatten()
-    reasons = sorted(zip(features, impacts), key=lambda x: abs(float(x)), reverse=True)[:4]
+   reasons = sorted(zip(features, impacts), key=lambda pair: abs(pair.__getitem__(1)), reverse=True)[:4]
     st.markdown("### 📋 Facteurs clés justifiant la décision (Audit & Comité)")
     cols = st.columns(2)
     for i, (f, v) in enumerate(reasons):
