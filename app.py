@@ -202,7 +202,7 @@ def display_scoring(inp_dict, loan_amt):
     impacts = (-scaler.transform(X_c) * clf.coef_).flatten()
 reasons = sorted(zip(features, impacts), key=lambda pair: abs(pair.__getitem__(1)), reverse=True)[:4]
 st.markdown("### 📋 Facteurs clés justifiant la décision (Audit & Comité)")
-    cols = st.columns(2)
+cols = st.columns(2)
     for i, (f, v) in enumerate(reasons):
         lbl = LABELS.get(f, f)
         if v >= 0:
